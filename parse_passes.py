@@ -22,7 +22,18 @@ nDict = {
 		'Eighth': 8,
 		'Ninth': 9,
 		'Tenth': 10,
-		'Eleventh': 11}
+		'Eleventh': 11,
+		'1': 1,
+		'2': 2,
+		'3': 3,
+		'4': 4,
+		'5': 5,
+		'6': 6,
+		'7': 7,
+		'8': 8,
+		'9': 9,
+		'10': 10,
+		'11': 11}
 sDict = {
 		'Home (left)': 0,
 		'Away (right)': 1}
@@ -56,9 +67,13 @@ def parse(game, distribution = True, ignore = False):
 	allTPs = []
 	homeLastLen = [0]
 	awayLastLen = [0]
+
 	with open(batches, 'rU') as infile:
 		reader = csv.reader(infile)
 		reader.next()
+		home_order = []
+		away_order = []
+
 		for row in reader:
 			if gDict[row[27]] == game:
 				home = game[:3]
@@ -67,15 +82,19 @@ def parse(game, distribution = True, ignore = False):
 					team = home
 					myDict = homeDict
 					myLastLen = homeLastLen
+					home_order.append(row[28])
 				else:
 					team = away
 					myDict = awayDict
 					myLastLen = awayLastLen
+					away_order.append(row[28])
+
 				pid = row[34]
 				TP = row[30][:5]
 				distro = [int(n) for n in row[31].split(',')]
 				allTPs.append(TP)
 				allDistros.append(distro[:11])
+
 				if myLastLen[-1] != len(distro):
 					if myLastLen[-1] == 0:
 						myLastLen.append(len(distro))
@@ -85,35 +104,48 @@ def parse(game, distribution = True, ignore = False):
 						print 'Check for time errors after fix'
 				else:
 					myLastLen.append(len(distro))
+
 				longP = [int(n) for n in row[32].split(',')]
 				medP = [int(n) for n in row[33].split(',')]
 				shortP = [int(n) for n in row[35].split(',')]
+
 				for pData in [longP, medP, shortP]:
 					if pData[0] > pData[1]:
 						print 'Pass Order Error:', game, row[27], row[28], row[29]
+
 				if not ignore:
 					if sum(distro) != sum([longP[0], medP[0], shortP[0]]):
 						print 'Distribution Error:', game, row[27], row[28], row[29], sum(distro)
+
 				myDict[pid] = distro[:11] + longP + medP + shortP + [TP]
+
 				if distribution:
 					myDict[pid] = myDict[pid][:11]
 	if (len(homeDict.keys()) != 11) or (len(awayDict.keys()) != 11):
 		print 'Incomplete Data:', game, gDict[game]
+
 	homeSubs = homeLastLen[-1] - 11
 	awaySubs = awayLastLen[-1] - 11
+
 	if len(allDistros) != len(list(uniq(allDistros))):
 		print 'Row Duplicate Error:', game, gDict[game], len(allDistros) - len(list(uniq(allDistros)))
 		if len(set(allTPs)) - 1 != homeSubs + awaySubs:
 			print 'Time Error:', game, gDict[game]
+
 	df1 = DataFrame(homeDict)
 	df2 = DataFrame(awayDict)
-	for df in [df1, df2]:
+
+	for df, order in [(df1, home_order), (df2, away_order)]:
 		df = df.transpose()
+		order = [nDict[n] for n in order]
+
 		players = [int(n) for n in df.index]
 		players.sort()
+
 		ixDict = {}
 		for i in range(11): #Making a dict for df.rename()
-			ixDict[i] = players[i]
+			n = order[i]
+			ixDict[n - 1] = players[i]
 		if not distribution:
 			ixDict.update(keyDict)
 		df.rename(columns = ixDict, inplace = True)

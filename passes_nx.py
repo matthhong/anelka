@@ -7,21 +7,27 @@ import matplotlib.pyplot as plt
 import networkx as nx
 
 def df_to_graph(df):
-	G = nx.from_numpy_matrix(df.values, create_using=nx.DiGraph())
-	G = nx.relabel_nodes(G, dict(enumerate(df.columns)))
-	weights = nx.get_edge_attributes(G, 'weight')
-	invW = dict([(k, 1/float(v)) for (k,v) in weights.items()])
-	nx.set_edge_attributes(G, 'distance', invW)
-	return G
+    G = nx.from_numpy_matrix(df.values, create_using=nx.DiGraph())
+    G = nx.relabel_nodes(G, dict(enumerate(df.columns)))
+    weights = nx.get_edge_attributes(G, 'weight')
+    invW = dict([(k, 1/float(v)) for (k,v) in weights.items()])
+    nx.set_edge_attributes(G, 'distance', invW)
+    return G
 
 def all_passing_stats(pDict, func, weight = 'weight'):
-	stats = ddict(dict)
-	for team1 in pDict.keys():
-		for team2 in pDict[team1].keys():
-			G = df_to_graph(pDict[team1][team2])
-			stats[team1][team2] = func(G, weight = weight)
-	return sorted(stats, key=lambda tup: tup[2])
+    stats = ddict(dict)
+    for team1 in pDict.keys():
+        for team2 in pDict[team1].keys():
+            G = df_to_graph(pDict[team1][team2])
+            stats[team1][team2] = func(G, weight = weight)
+    return stats
 
+def sort_stats(stats):
+    stats_list = []
+    for k1 in stats.keys():
+        for k2 in stats[k1].keys():
+            stats_list.append((k1, k2, stats[k1][k2]))
+    return sorted(stats_list, key=lambda tup: tup[2])
 
 # def degree_distribution_plots(passingDict):
 # 	pp = PdfPages('./Figures/degree_distribution_plots.pdf')
@@ -54,11 +60,8 @@ def relevant_stats(G):
 
 	return
 
-def directed_weighted_triangles_and_degree_iter(G, nodes=None, weight='weight', motif = 'middleman'):
-    """ Return an iterator of (node, degree, weighted_triangles).  
-    
-    Used for directed, weighted clustering.
-    """
+def directed_weighted_triangles_and_degree_iter(G, nodes=None, weight=None, motif = 'middleman'):
+    """Modified to include just middleman motifs."""
     if G.is_multigraph():
         raise NetworkXError("Not defined for multigraphs.")
 
@@ -83,11 +86,15 @@ def directed_weighted_triangles_and_degree_iter(G, nodes=None, weight='weight', 
                 wik=G[i][k].get(weight,1.0)/max_weight
                 wjk=G[j][k].get(weight,1.0)/max_weight
                 weighted_triangles+=(wji*wik*wjk)**(1.0/3.0)
-        out_deg = sum(attrs[weight] for k, attrs in out_nbrs.items())
+        if weight:
+            out_deg = sum(attrs[weight] for k, attrs in out_nbrs.items())
+        else:
+            out_deg = sum(1 for k in out_nbrs.items())
+            
         yield (i,out_deg,weighted_triangles)
 
 def average_clustering(G, nodes=None, weight=None, count_zeros=True):
-	c=clustering(G,nodes,weight=weight).values()
+	c=clustering(G,nodes,weight).values()
 	if not count_zeros:
 		c = [v for v in c if v > 0]
 	return sum(c)/float(len(c))
